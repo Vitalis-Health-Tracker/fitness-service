@@ -1,7 +1,7 @@
 package com.example.fitness_service.model;
 
 
-import com.example.fitness_service.dto.fitnessDto;
+import com.example.fitness_service.dto.FitnessDto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,10 +14,10 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "Fitness_Service")
-public class fitnessModel {
+public class FitnessModel {
     private String fitness_Id;
     private LocalDate fitness_Date;
     private String user_Id;
-    public List<fitnessDto> workoutList;
+    public List<FitnessDto> workoutList;
 
 }
