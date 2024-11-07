@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FitnessDto {
+
+    private String workoutId;
     private String workoutName;
     private Integer reps;
     private Integer duration;
