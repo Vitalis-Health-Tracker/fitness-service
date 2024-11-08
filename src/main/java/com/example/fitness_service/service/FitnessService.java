@@ -5,31 +5,35 @@ import com.example.fitness_service.model.FitnessModel;
 import com.example.fitness_service.repository.FitnessRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class FitnessService {
+    private final FitnessRepository fitnessRepository;
+    private final WebClient webClient;
+
     @Autowired
-    FitnessRepository fitnessRepository;
+    public FitnessService(FitnessRepository fitnessRepository, WebClient.Builder webClientBuilder) {
+        this.fitnessRepository = fitnessRepository;
+        this.webClient = webClientBuilder.baseUrl("https://externalapi.com").build();
+    }
 
-    RestClient restClient = RestClient.create();
-
-    public FitnessDto getWorkoutDetails(String workoutName){
-        return restClient.get()
-                .uri("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"+workoutName)
+    public Mono<FitnessDto> getWorkoutDetails(String workoutName) {
+        return webClient.get()
+                .uri("/workouts/" + workoutName)
                 .retrieve()
-                .body(FitnessDto.class);
+                .bodyToMono(FitnessDto.class);
     }
 
     private float calculateCalories(FitnessDto workout) {
         return workout.getReps() * workout.getSets() * workout.getDuration() * 0.1f;
     }
 
-    public FitnessModel addFitnessEntry(String userId, List<FitnessDto> workouts) {
+    public Mono<FitnessModel> addFitnessEntry(String userId, List<FitnessDto> workouts) {
         float totalCalories = 0;
         for (FitnessDto workout : workouts) {
             float calories = calculateCalories(workout);
@@ -45,10 +49,7 @@ public class FitnessService {
         return fitnessRepository.save(fitnessModel);
     }
 
-    public Optional<FitnessModel> getFitnessDetailsByUserId(String userId) {
-        return fitnessRepository.findById(userId);
+    public List<FitnessModel> getFitnessDetailsByUserId(String userId) {
+        return fitnessRepository.findByUserId(userId);
     }
-
-
-
 }
