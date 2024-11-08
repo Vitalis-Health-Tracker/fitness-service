@@ -8,34 +8,37 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
 @RequestMapping("/health/fitness")
 public class FitnessController {
 
-    @Autowired
-    private FitnessService fitnessService;
 
-    @GetMapping("/workout-details/{workoutName}")
-    public ResponseEntity<FitnessDto> fetchWorkoutDetails(@PathVariable String workoutName) {
-        FitnessDto workoutDetails = fitnessService.getWorkoutDetails(workoutName).block();
-        return workoutDetails != null
-                ? ResponseEntity.ok(workoutDetails)
-                : ResponseEntity.notFound().build();
+    private final FitnessService fitnessService;
+
+    public FitnessController(FitnessService fitnessService) {
+        this.fitnessService = fitnessService;
     }
 
-    @PostMapping("/workouts/{userId}")
-    public ResponseEntity<Mono<FitnessModel>> addWorkoutsForUser(@PathVariable String userId, @RequestBody List<FitnessDto> workouts) {
-        Mono<FitnessModel> fitnessModel = fitnessService.addFitnessEntry(userId, workouts);
-        return ResponseEntity.ok(fitnessModel);
+    @PostMapping("/{userId}/workout")
+    public Mono<FitnessModel> addWorkout(@PathVariable String userId, @RequestParam String workoutName) {
+        return fitnessService.addWorkout(userId, workoutName);
     }
 
-    @GetMapping("/workouts/user/{userId}")
-    public ResponseEntity<List<FitnessModel>> getFitnessDetailsByUserId(@PathVariable String userId) {
-        List<FitnessModel> fitnessDetails = fitnessService.getFitnessDetailsByUserId(userId);
-        return fitnessDetails.isEmpty()
-                ? ResponseEntity.notFound().build()
-                : ResponseEntity.ok(fitnessDetails);
+    @GetMapping("/{userId}/calories")
+    public Mono<Float> calculateTotalCalories(@PathVariable String userId) {
+        return fitnessService.calculateTotalCalories(userId, LocalDate.now());
+    }
+
+    @PutMapping("/{fitnessId}/workout")
+    public Mono<FitnessModel> updateWorkout(@PathVariable String fitnessId, @RequestBody FitnessDto updatedWorkout) {
+        return fitnessService.updateWorkout(fitnessId, updatedWorkout);
+    }
+
+    @DeleteMapping("/{fitnessId}/workout/{workoutId}")
+    public Mono<Void> deleteWorkout(@PathVariable String fitnessId, @PathVariable String workoutId) {
+        return fitnessService.deleteWorkout(fitnessId, workoutId);
     }
 }
