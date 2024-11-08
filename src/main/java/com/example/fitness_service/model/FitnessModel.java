@@ -15,9 +15,9 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "Fitness_Service")
 public class FitnessModel {
-    private String fitness_Id;
-    private LocalDate fitness_Date;
-    private String user_Id;
+    private String fitnessId;
+    private LocalDate fitnessDate;
+    private String userId;
     public List<FitnessDto> workoutList;
-
+    public Float totalCaloriesBurned;
 }
