@@ -1,7 +1,7 @@
 package com.example.fitness_service.model;
 
 
-import com.example.fitness_service.dto.FitnessDto;
+import com.example.fitness_service.dto.ExerciseDto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -18,6 +18,6 @@ public class FitnessModel {
     private String fitnessId;
     private LocalDate fitnessDate;
     private String userId;
-    public List<FitnessDto> workoutList;
+    public List<ExerciseDto> workoutList;
     public Float totalCaloriesBurned;
 }

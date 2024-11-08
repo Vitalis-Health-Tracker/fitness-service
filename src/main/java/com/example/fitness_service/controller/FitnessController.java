@@ -1,15 +1,12 @@
 package com.example.fitness_service.controller;
 
-import com.example.fitness_service.dto.FitnessDto;
+import com.example.fitness_service.dto.ExerciseDto;
 import com.example.fitness_service.model.FitnessModel;
 import com.example.fitness_service.service.FitnessService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @RestController
 @RequestMapping("/health/fitness")
@@ -33,7 +30,7 @@ public class FitnessController {
     }
 
     @PutMapping("/{fitnessId}/workout")
-    public Mono<FitnessModel> updateWorkout(@PathVariable String fitnessId, @RequestBody FitnessDto updatedWorkout) {
+    public Mono<FitnessModel> updateWorkout(@PathVariable String fitnessId, @RequestBody ExerciseDto updatedWorkout) {
         return fitnessService.updateWorkout(fitnessId, updatedWorkout);
     }
 

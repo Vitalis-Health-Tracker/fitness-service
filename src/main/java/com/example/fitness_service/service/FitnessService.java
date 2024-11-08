@@ -1,9 +1,8 @@
 package com.example.fitness_service.service;
 
-import com.example.fitness_service.dto.FitnessDto;
+import com.example.fitness_service.dto.ExerciseDto;
 import com.example.fitness_service.model.FitnessModel;
 import com.example.fitness_service.repository.FitnessRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -41,11 +40,11 @@ public class FitnessService {
     public Mono<Float> calculateTotalCalories(String userId, LocalDate fitnessDate) {
         return fitnessRepository.findByUserIdAndFitnessDate(userId, fitnessDate)
                 .flatMapMany(fitness -> Flux.fromIterable(fitness.getWorkoutList()))
-                .map(FitnessDto::getCaloriesBurned)
+                .map(ExerciseDto::getCaloriesBurned)
                 .reduce(0.0f, Float::sum);
     }
 
-    public Mono<FitnessModel> updateWorkout(String fitnessId, FitnessDto updatedWorkout) {
+    public Mono<FitnessModel> updateWorkout(String fitnessId, ExerciseDto updatedWorkout) {
         return fitnessRepository.findById(fitnessId)
                 .flatMap(fitness -> {
                     fitness.getWorkoutList().stream()
@@ -72,10 +71,10 @@ public class FitnessService {
                 .then();
     }
 
-    private Mono<FitnessDto> fetchWorkoutDetails(String workoutName) {
+    private Mono<ExerciseDto> fetchWorkoutDetails(String workoutName) {
         return webClient.get()
                 .uri("/workouts/{name}", workoutName)
                 .retrieve()
-                .bodyToMono(FitnessDto.class);
+                .bodyToMono(ExerciseDto.class);
     }
 }
