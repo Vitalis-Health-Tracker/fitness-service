@@ -24,6 +24,12 @@ public class FitnessController {
         return fitnessService.addWorkout(userId, workoutName);
     }
 
+    @PostMapping("/workoutadd")
+    public Mono<FitnessModel> addWorkout2(@RequestParam String workoutName) {
+        return fitnessService.addWorkout2(workoutName);
+
+    }
+
     @GetMapping("/{userId}/calories")
     public Mono<Float> calculateTotalCalories(@PathVariable String userId) {
         return fitnessService.calculateTotalCalories(userId, LocalDate.now());
