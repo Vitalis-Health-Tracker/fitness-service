@@ -10,11 +10,14 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 
 @Repository
 public interface FitnessRepository extends ReactiveMongoRepository<FitnessModel, String> {
-    Mono<FitnessModel> findByUserIdAndFitnessDate(String userId, LocalDate fitnessDate);
+    Mono<FitnessModel> findByUserIdAndFitnessDate(String userId, LocalDateTime fitnessDate);
     Flux<FitnessModel> findByFitnessDate(LocalDate fitnessDate);
+
+    Mono<FitnessModel> findByUserIdAndFitnessDateBetween(String userId, LocalDateTime startOfDay, LocalDateTime endOfDay);
 }
