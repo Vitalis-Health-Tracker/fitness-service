@@ -11,10 +11,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class FitnessService {
@@ -63,55 +60,34 @@ public class FitnessService {
         });
     }
 
-    public Mono<FitnessModel> updateWorkoutAndCalculateCalories(String userId) {
-        // Get the workout list for the user
-        List<ExerciseDto> workoutList = temporaryWorkoutList.getOrDefault(userId, new ArrayList<>());
 
-        // Calculate the total calories from the workout list in a non-blocking way
-        Mono<Float> totalCaloriesMono = Flux.fromIterable(workoutList)
-                .map(ExerciseDto::getCaloriesBurned)
-                .reduce(0.0f, Float::sum); // No blocking here
+    public Mono<FitnessModel> deleteWorkout(String userId, String workoutId) {
+        // Define the start and end of today's date for the query
+        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime todayEnd = todayStart.plusDays(1);
 
-        return totalCaloriesMono.flatMap(totalCalories -> {
-            // Search for an existing FitnessModel by userId and today's date
-            LocalDateTime today = LocalDateTime.now().toLocalDate().atStartOfDay(); // Start of today's date
-            return fitnessRepository.findByUserIdAndFitnessDateBetween(userId, today, today.plusDays(1))
-                    .flatMap(existingFitness -> {
-                        // Update the existing record if found
-                        existingFitness.setWorkoutList(workoutList);
-                        existingFitness.setTotalCaloriesBurned(totalCalories);
-                        existingFitness.setFitnessDate(today); // Ensure the fitness date is today's date
+        // Find the existing FitnessModel entry for today and the given userId
+        return fitnessRepository.findByUserIdAndFitnessDateBetween(userId, todayStart, todayEnd)
+                .flatMap(existingFitness -> {
+                    // Find and remove the workout from the existing workout list
+                    boolean workoutRemoved = existingFitness.getWorkoutList().removeIf(workout -> workout.getWorkoutId().equals(workoutId));
 
-                        // Save the updated record
-                        return fitnessRepository.save(existingFitness)
-                                .doOnSuccess(savedFitness -> temporaryWorkoutList.remove(userId)); // Clear the temporary list after saving
-                    })
-                    .switchIfEmpty(
-                            // If no record found, create a new one
-                            Mono.defer(() -> {
-                                FitnessModel newFitnessModel = new FitnessModel();
-                                newFitnessModel.setUserId(userId);
-                                newFitnessModel.setFitnessDate(today); // Set the current date
-                                newFitnessModel.setWorkoutList(workoutList);
-                                newFitnessModel.setTotalCaloriesBurned(totalCalories); // Set the total calories burned
+                    if (workoutRemoved) {
+                        // Recalculate total calories after removal
+                        float totalCalories = existingFitness.getWorkoutList().stream()
+                                .map(ExerciseDto::getCaloriesBurned)
+                                .reduce(0.0f, Float::sum);
 
-                                // Save the new record
-                                return fitnessRepository.save(newFitnessModel)
-                                        .doOnSuccess(savedFitness -> temporaryWorkoutList.remove(userId)); // Clear the temporary list after saving
-                            })
-                    );
-        });
-    }
+                        existingFitness.setTotalCaloriesBurned(totalCalories); // Update total calories burned
 
-
-
-    public Mono<Void> deleteWorkout(String fitnessId, String workoutId) {
-        return fitnessRepository.findById(fitnessId)
-                .flatMap(fitness -> {
-                    fitness.getWorkoutList().removeIf(workout -> workout.getWorkoutId().equals(workoutId));
-                    return fitnessRepository.save(fitness);
+                        // Save the updated fitness record
+                        return fitnessRepository.save(existingFitness);
+                    } else {
+                        // If the workout was not found, return an error
+                        return Mono.error(new RuntimeException("Workout with ID " + workoutId + " not found"));
+                    }
                 })
-                .then();
+                .switchIfEmpty(Mono.error(new RuntimeException("No fitness record found for userId " + userId + " today")));
     }
 
     private Mono<ExerciseDto> fetchWorkoutDetails(String workoutName) {
@@ -138,5 +114,84 @@ public class FitnessService {
                     return null;
                 });
     }
+
+
+    public Mono<FitnessModel> updateWorkoutList(String userId, String workoutName) {
+        return fetchWorkoutDetails(workoutName)
+                .flatMap(workout -> {
+                    // Find the user's fitness record for today
+                    LocalDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay();
+                    LocalDateTime endOfDay = startOfDay.plusDays(1);
+
+                    return fitnessRepository.findByUserIdAndFitnessDateBetween(userId, startOfDay, endOfDay)
+                            .flatMap(existingFitness -> {
+                                // Add the fetched workout to the list
+                                existingFitness.getWorkoutList().add(workout);
+
+                                // Recalculate total calories burned
+                                float totalCalories = existingFitness.getWorkoutList().stream()
+                                        .map(ExerciseDto::getCaloriesBurned)
+                                        .reduce(0.0f, Float::sum);
+
+                                existingFitness.setTotalCaloriesBurned(totalCalories);
+
+                                // Save the updated fitness record
+                                return fitnessRepository.save(existingFitness);
+                            })
+                            .switchIfEmpty(Mono.defer(() -> {
+                                // If the fitness record doesn't exist, create a new one
+                                FitnessModel newFitnessModel = new FitnessModel();
+                                newFitnessModel.setUserId(userId);
+                                newFitnessModel.setFitnessDate(LocalDateTime.now());
+                                newFitnessModel.setWorkoutList(Collections.singletonList(workout));
+
+                                // Set total calories (in case of first workout)
+                                newFitnessModel.setTotalCaloriesBurned(workout.getCaloriesBurned());
+
+                                return fitnessRepository.save(newFitnessModel);
+                            }));
+                });
+    }
+
+
+    public Mono<FitnessModel> editWorkout(String fitnessId, String workoutId, ExerciseDto updatedWorkout) {
+        return fitnessRepository.findById(fitnessId)
+                .flatMap(existingFitness -> {
+                    // Find the workout to update in the existing workout list
+                    Optional<ExerciseDto> workoutOpt = existingFitness.getWorkoutList().stream()
+                            .filter(workout -> workout.getWorkoutId().equals(workoutId))
+                            .findFirst();
+
+                    // If the workout is found, update it
+                    if (workoutOpt.isPresent()) {
+                        ExerciseDto existingWorkout = workoutOpt.get();
+                        // Update fields
+                        existingWorkout.setWorkoutName(updatedWorkout.getWorkoutName());
+                        existingWorkout.setReps(updatedWorkout.getReps());
+                        existingWorkout.setSets(updatedWorkout.getSets());
+                        existingWorkout.setDuration(updatedWorkout.getDuration());
+                        existingWorkout.setCaloriesBurned(updatedWorkout.getCaloriesBurned());
+                        existingWorkout.setWorkoutType(updatedWorkout.getWorkoutType());
+
+                        // Recalculate total calories after update
+                        float totalCalories = existingFitness.getWorkoutList().stream()
+                                .map(ExerciseDto::getCaloriesBurned)
+                                .reduce(0.0f, Float::sum);
+
+                        existingFitness.setTotalCaloriesBurned(totalCalories);
+                        existingFitness.setFitnessId(fitnessId);
+
+                        // Save the updated document
+                        return fitnessRepository.save(existingFitness);
+                    } else {
+                        // If no workout is found, return an error
+                        return Mono.error(new RuntimeException("Workout with ID " + workoutId + " not found"));
+                    }
+                })
+                .switchIfEmpty(Mono.error(new RuntimeException("Fitness record with ID " + fitnessId + " not found")));
+    }
+
+
+
 
 }
