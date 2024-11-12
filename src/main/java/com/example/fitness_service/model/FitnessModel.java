@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -16,7 +17,7 @@ import java.util.List;
 @Document(collection = "Fitness_Service")
 public class FitnessModel {
     private String fitnessId;
-    private LocalDate fitnessDate;
+    private LocalDateTime fitnessDate;
     private String userId;
     public List<ExerciseDto> workoutList;
     public Float totalCaloriesBurned;

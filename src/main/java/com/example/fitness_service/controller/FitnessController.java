@@ -6,7 +6,7 @@ import com.example.fitness_service.service.FitnessService;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/health/fitness")
@@ -20,24 +20,21 @@ public class FitnessController {
     }
 
     @PostMapping("/{userId}/workout")
-    public Mono<FitnessModel> addWorkout(@PathVariable String userId, @RequestParam String workoutName) {
+    public Mono<Void> addWorkout(@PathVariable String userId, @RequestParam String workoutName) {
         return fitnessService.addWorkout(userId, workoutName);
     }
-
-    @PostMapping("/workoutadd")
-    public Mono<FitnessModel> addWorkout2(@RequestParam String workoutName) {
-        return fitnessService.addWorkout2(workoutName);
-
+    @PostMapping("/{userId}/save-workouts")
+    public Mono<FitnessModel> saveWorkouts(@PathVariable String userId) {
+        return fitnessService.saveWorkoutAndCalculateCalories(userId);
     }
 
-    @GetMapping("/{userId}/calories")
-    public Mono<Float> calculateTotalCalories(@PathVariable String userId) {
-        return fitnessService.calculateTotalCalories(userId, LocalDate.now());
-    }
 
-    @PutMapping("/{fitnessId}/workout")
-    public Mono<FitnessModel> updateWorkout(@PathVariable String fitnessId, @RequestBody ExerciseDto updatedWorkout) {
-        return fitnessService.updateWorkout(fitnessId, updatedWorkout);
+
+
+
+    @PutMapping("/{userId}/update-workout")
+    public Mono<FitnessModel> updateWorkout(@PathVariable String userId) {
+        return fitnessService.updateWorkoutAndCalculateCalories(userId);
     }
 
     @DeleteMapping("/{fitnessId}/workout/{workoutId}")
