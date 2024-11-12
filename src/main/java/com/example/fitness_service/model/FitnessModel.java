@@ -5,6 +5,7 @@ import com.example.fitness_service.dto.ExerciseDto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
@@ -16,6 +17,7 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "Fitness_Service")
 public class FitnessModel {
+    @Id
     private String fitnessId;
     private LocalDateTime fitnessDate;
     private String userId;

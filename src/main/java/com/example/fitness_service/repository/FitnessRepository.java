@@ -17,7 +17,8 @@ import java.util.List;
 @Repository
 public interface FitnessRepository extends ReactiveMongoRepository<FitnessModel, String> {
     Mono<FitnessModel> findByUserIdAndFitnessDate(String userId, LocalDateTime fitnessDate);
-    Flux<FitnessModel> findByFitnessDate(LocalDate fitnessDate);
 
-    Mono<FitnessModel> findByUserIdAndFitnessDateBetween(String userId, LocalDateTime startOfDay, LocalDateTime endOfDay);
+    Mono<FitnessModel> findByUserIdAndFitnessDateBetween(String userId, LocalDateTime todayStart, LocalDateTime todayEnd);
+
+    Mono<FitnessModel> findByUserId(String userId);
 }

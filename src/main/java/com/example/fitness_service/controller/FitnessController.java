@@ -3,6 +3,8 @@ package com.example.fitness_service.controller;
 import com.example.fitness_service.dto.ExerciseDto;
 import com.example.fitness_service.model.FitnessModel;
 import com.example.fitness_service.service.FitnessService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -27,18 +29,31 @@ public class FitnessController {
     public Mono<FitnessModel> saveWorkouts(@PathVariable String userId) {
         return fitnessService.saveWorkoutAndCalculateCalories(userId);
     }
-
-
-
-
-
-    @PutMapping("/{userId}/update-workout")
-    public Mono<FitnessModel> updateWorkout(@PathVariable String userId) {
-        return fitnessService.updateWorkoutAndCalculateCalories(userId);
+    @PostMapping("/{userId}/update-workouts")
+    public Mono<ResponseEntity<FitnessModel>> addWorkoutToList(@PathVariable String userId, @RequestParam String workoutName) {
+        return fitnessService.updateWorkoutList(userId, workoutName)
+                .map(ResponseEntity::ok)
+                .onErrorResume(e -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()));
     }
 
-    @DeleteMapping("/{fitnessId}/workout/{workoutId}")
-    public Mono<Void> deleteWorkout(@PathVariable String fitnessId, @PathVariable String workoutId) {
-        return fitnessService.deleteWorkout(fitnessId, workoutId);
+    @DeleteMapping("/{userId}/workouts/{workoutId}")
+    public Mono<ResponseEntity<String>> deleteWorkout(
+            @PathVariable String userId,
+            @PathVariable String workoutId) {
+        return fitnessService.deleteWorkout(userId, workoutId)
+                .map(updatedFitness -> ResponseEntity.ok("Workout deleted successfully"))
+                .onErrorResume(e -> Mono.just(ResponseEntity.badRequest().body(e.getMessage())));
     }
+
+    @PutMapping("/{fitnessId}/workouts/{workoutId}")
+    public Mono<ResponseEntity<String>> editWorkout(
+            @PathVariable String fitnessId,
+            @PathVariable String workoutId,
+            @RequestBody ExerciseDto updatedWorkout) {
+        return fitnessService.editWorkout(fitnessId, workoutId, updatedWorkout)
+                .map(updatedFitness -> ResponseEntity.ok("Workout updated successfully"))
+                .onErrorResume(e -> Mono.just(ResponseEntity.badRequest().body(e.getMessage())));
+    }
+
+
 }
