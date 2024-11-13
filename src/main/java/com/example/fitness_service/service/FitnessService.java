@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Service
@@ -23,6 +24,13 @@ public class FitnessService {
     public FitnessService(FitnessRepository fitnessRepository, WebClient.Builder webClientBuilder) {
         this.fitnessRepository = fitnessRepository;
         this.webClient = webClientBuilder.baseUrl("https://sharunraj.github.io/fitnessApi.github.io/").build();
+    }
+
+    public Mono<Void> addCustomWorkout(String userId, ExerciseDto customWorkout) {
+        // Add the custom workout directly to the user's temporary workout list
+        temporaryWorkoutList.computeIfAbsent(userId, k -> new ArrayList<>()).add(customWorkout);
+        System.out.println("Custom Workout Added: " + customWorkout);
+        return Mono.empty(); // No return value needed, just update the map
     }
 
     public Mono<Void> addWorkout(String userId, String workoutName) {
@@ -116,41 +124,43 @@ public class FitnessService {
     }
 
 
-    public Mono<FitnessModel> updateWorkoutList(String userId, String workoutName) {
-        return fetchWorkoutDetails(workoutName)
-                .flatMap(workout -> {
-                    // Find the user's fitness record for today
-                    LocalDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay();
-                    LocalDateTime endOfDay = startOfDay.plusDays(1);
+    // Update the user's workout for the current date by adding new workouts and recalculating the total calories burned
+    public Mono<FitnessModel> updateWorkout(String userId) {
+        // Get the current date and time
+        LocalDateTime currentDateTime = LocalDateTime.now();
 
-                    return fitnessRepository.findByUserIdAndFitnessDateBetween(userId, startOfDay, endOfDay)
-                            .flatMap(existingFitness -> {
-                                // Add the fetched workout to the list
-                                existingFitness.getWorkoutList().add(workout);
+        // Get the start of the day (00:00:00)
+        LocalDateTime todayStart = currentDateTime.truncatedTo(ChronoUnit.DAYS);
 
-                                // Recalculate total calories burned
-                                float totalCalories = existingFitness.getWorkoutList().stream()
-                                        .map(ExerciseDto::getCaloriesBurned)
-                                        .reduce(0.0f, Float::sum);
+        // Get the end of the day (23:59:59.999999999)
+        LocalDateTime todayEnd = currentDateTime.withHour(23).withMinute(59).withSecond(59).withNano(999999999);
 
-                                existingFitness.setTotalCaloriesBurned(totalCalories);
+        // First, check if a fitness entry for the user already exists for today
+        return fitnessRepository.findByUserIdAndFitnessDateBetween(userId, todayStart, todayEnd)
+                .flatMap(existingFitness -> {
+                    // If a fitness entry already exists, add the new workouts from the temporary list
+                    List<ExerciseDto> currentWorkoutList = existingFitness.getWorkoutList();
+                    List<ExerciseDto> newWorkoutList = temporaryWorkoutList.getOrDefault(userId, new ArrayList<>());
+                    currentWorkoutList.addAll(newWorkoutList); // Add new workouts to the existing list
 
-                                // Save the updated fitness record
-                                return fitnessRepository.save(existingFitness);
-                            })
-                            .switchIfEmpty(Mono.defer(() -> {
-                                // If the fitness record doesn't exist, create a new one
-                                FitnessModel newFitnessModel = new FitnessModel();
-                                newFitnessModel.setUserId(userId);
-                                newFitnessModel.setFitnessDate(LocalDateTime.now());
-                                newFitnessModel.setWorkoutList(Collections.singletonList(workout));
+                    // Recalculate total calories burned based on the updated workout list
+                    float totalCaloriesBurned = (float) currentWorkoutList.stream()
+                            .mapToDouble(ExerciseDto::getCaloriesBurned) // Calculate total calories for the workouts
+                            .sum();
 
-                                // Set total calories (in case of first workout)
-                                newFitnessModel.setTotalCaloriesBurned(workout.getCaloriesBurned());
+                    // Set the updated workout list and total calories burned
+                    existingFitness.setWorkoutList(currentWorkoutList);
+                    existingFitness.setTotalCaloriesBurned(totalCaloriesBurned);
 
-                                return fitnessRepository.save(newFitnessModel);
-                            }));
-                });
+                    // Save the updated FitnessModel
+                    return fitnessRepository.save(existingFitness)
+                            .doOnSuccess(savedFitness -> {
+                                // Clear the temporary workout list after saving
+                                temporaryWorkoutList.remove(userId);
+                                System.out.println("Workout updated for user: " + userId);
+                            });
+                })
+                .switchIfEmpty(Mono.error(new RuntimeException("No fitness entry found for user on current date")));
     }
 
 
