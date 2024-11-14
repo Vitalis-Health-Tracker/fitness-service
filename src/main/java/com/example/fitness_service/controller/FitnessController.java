@@ -14,8 +14,6 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/health/fitness")
 public class FitnessController {
-
-
     private final FitnessService fitnessService;
 
     public FitnessController(FitnessService fitnessService) {
@@ -58,5 +56,10 @@ public class FitnessController {
                 .onErrorResume(e -> Mono.just(ResponseEntity.badRequest().body(e.getMessage())));
     }
 
-
+    @GetMapping("/{userId}/get-workouts")
+    public Mono<ResponseEntity<FitnessModel>> getWorkouts(@PathVariable String userId, @RequestParam LocalDateTime startDate, @RequestParam LocalDateTime endDate) {
+        return fitnessService.getWorkoutsByWeek(userId, startDate, endDate)
+                .map(fitnessModel -> ResponseEntity.ok(fitnessModel))
+                .onErrorResume(e -> Mono.just(ResponseEntity.badRequest().body(null)));
+    }
 }

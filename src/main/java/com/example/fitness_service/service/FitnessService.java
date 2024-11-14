@@ -202,6 +202,8 @@ public class FitnessService {
     }
 
 
-
-
+    public Mono<FitnessModel> getWorkoutsByWeek(String userId, LocalDateTime startDate, LocalDateTime endDate) {
+        return fitnessRepository.findByUserIdAndFitnessDateBetween(userId, startDate, endDate)
+                .switchIfEmpty(Mono.error(new RuntimeException("No fitness records found for the specified week")));
+    }
 }
