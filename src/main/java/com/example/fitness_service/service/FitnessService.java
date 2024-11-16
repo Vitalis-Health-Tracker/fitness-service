@@ -33,16 +33,23 @@ public class FitnessService {
         return Mono.empty(); // No return value needed, just update the map
     }
 
-    public Mono<Void> addWorkout(String userId, String workoutName) {
+    public Mono<Void> addWorkout(String userId, String workoutName, int inputReps, int inputSets, int inputDuration) {
         return fetchWorkoutDetails(workoutName)
-                .doOnSuccess(workout -> {
-                    // Temporary store in the map by userId
-                    //Display the workout details
-                    temporaryWorkoutList.computeIfAbsent(userId, k -> new ArrayList<>()).add(workout);
-                    System.out.println("Workout Details: " + workout);
+                .doOnSuccess(baseWorkout -> {
+                    // Dynamically calculate calories burned
+                    float calculatedCalories = calculateCaloriesBurned(baseWorkout, inputReps, inputSets, inputDuration);
+
+                    // Update the workout details
+                    baseWorkout.setReps(inputReps);
+                    baseWorkout.setSets(inputSets);
+                    baseWorkout.setDuration(inputDuration);
+                    baseWorkout.setCaloriesBurned(calculatedCalories);
+
+                    // Add the workout to the user's temporary list
+                    temporaryWorkoutList.computeIfAbsent(userId, k -> new ArrayList<>()).add(baseWorkout);
+                    System.out.println("Workout Added: " + baseWorkout);
                 })
                 .then();
-
     }
 
     public Mono<FitnessModel> saveWorkoutAndCalculateCalories(String userId) {
@@ -167,43 +174,80 @@ public class FitnessService {
     public Mono<FitnessModel> editWorkout(String fitnessId, String workoutId, ExerciseDto updatedWorkout) {
         return fitnessRepository.findById(fitnessId)
                 .flatMap(existingFitness -> {
-                    // Find the workout to update in the existing workout list
                     Optional<ExerciseDto> workoutOpt = existingFitness.getWorkoutList().stream()
                             .filter(workout -> workout.getWorkoutId().equals(workoutId))
                             .findFirst();
 
-                    // If the workout is found, update it
                     if (workoutOpt.isPresent()) {
                         ExerciseDto existingWorkout = workoutOpt.get();
+
                         // Update fields
                         existingWorkout.setWorkoutName(updatedWorkout.getWorkoutName());
                         existingWorkout.setReps(updatedWorkout.getReps());
                         existingWorkout.setSets(updatedWorkout.getSets());
                         existingWorkout.setDuration(updatedWorkout.getDuration());
-                        existingWorkout.setCaloriesBurned(updatedWorkout.getCaloriesBurned());
-                        existingWorkout.setWorkoutType(updatedWorkout.getWorkoutType());
 
-                        // Recalculate total calories after update
+                        // Recalculate calories for the updated workout
+                        float updatedCalories = calculateCaloriesBurned(existingWorkout,
+                                updatedWorkout.getReps(),
+                                updatedWorkout.getSets(),
+                                updatedWorkout.getDuration());
+                        existingWorkout.setCaloriesBurned(updatedCalories);
+
+                        // Recalculate total calories for the fitness model
                         float totalCalories = existingFitness.getWorkoutList().stream()
                                 .map(ExerciseDto::getCaloriesBurned)
                                 .reduce(0.0f, Float::sum);
 
                         existingFitness.setTotalCaloriesBurned(totalCalories);
-                        existingFitness.setFitnessId(fitnessId);
 
-                        // Save the updated document
                         return fitnessRepository.save(existingFitness);
                     } else {
-                        // If no workout is found, return an error
                         return Mono.error(new RuntimeException("Workout with ID " + workoutId + " not found"));
                     }
                 })
                 .switchIfEmpty(Mono.error(new RuntimeException("Fitness record with ID " + fitnessId + " not found")));
     }
 
-
-    public Mono<FitnessModel> getWorkoutsByWeek(String userId, LocalDateTime startDate, LocalDateTime endDate) {
-        return fitnessRepository.findByUserIdAndFitnessDateBetween(userId, startDate, endDate)
+    public Mono<List<FitnessModel>> getWorkoutsByWeek(String userId, LocalDateTime startDate, LocalDateTime endDate) {
+        return fitnessRepository.findAllByUserIdAndFitnessDateBetween(userId, startDate, endDate)
+                .collectList()
                 .switchIfEmpty(Mono.error(new RuntimeException("No fitness records found for the specified week")));
     }
+
+    private float calculateCaloriesBurned(ExerciseDto baseWorkout, int inputReps, int inputSets, int inputDuration) {
+        float baseCalories = baseWorkout.getCaloriesBurned();
+        int baseReps = baseWorkout.getReps();
+        int baseSets = baseWorkout.getSets();
+        int baseDuration = baseWorkout.getDuration();
+
+        float calculatedCalories = 0;
+
+        // Contribution from duration
+        if (baseDuration > 0) {
+            calculatedCalories += baseCalories * ((float) inputDuration / baseDuration);
+        }
+
+        // Contribution from reps
+        if (baseReps > 0) {
+            calculatedCalories += baseCalories * 0.5f * ((float) inputReps / baseReps);
+        }
+
+        // Contribution from sets
+        if (baseSets > 0) {
+            calculatedCalories += baseCalories * 0.3f * ((float) inputSets / baseSets);
+        }
+
+        return calculatedCalories;
+    }
+    public Mono<FitnessModel> getWorkout(String userId) {
+        // Define the start and end of today's date for the query
+        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime todayEnd = todayStart.plusDays(1);
+
+        // Find the existing FitnessModel entry for today and the given userId
+        return fitnessRepository.findByUserIdAndFitnessDateBetween(userId, todayStart, todayEnd)
+                .switchIfEmpty(Mono.error(new RuntimeException("No fitness record found for userId " + userId + " today")));
+    }
+
 }
