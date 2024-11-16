@@ -20,5 +20,6 @@ public interface FitnessRepository extends ReactiveMongoRepository<FitnessModel,
 
     Mono<FitnessModel> findByUserIdAndFitnessDateBetween(String userId, LocalDateTime todayStart, LocalDateTime todayEnd);
 
+    Flux<FitnessModel> findAllByUserIdAndFitnessDateBetween(String userId, LocalDateTime start, LocalDateTime end);
     Mono<FitnessModel> findByUserId(String userId);
 }
