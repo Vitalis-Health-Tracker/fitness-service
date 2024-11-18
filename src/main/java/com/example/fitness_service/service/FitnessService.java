@@ -1,5 +1,6 @@
 package com.example.fitness_service.service;
 
+import com.example.fitness_service.FitnessServiceApplication;
 import com.example.fitness_service.dto.ExerciseDto;
 import com.example.fitness_service.model.FitnessModel;
 import com.example.fitness_service.repository.FitnessRepository;
@@ -53,25 +54,33 @@ public class FitnessService {
     }
 
     public Mono<FitnessModel> saveWorkoutAndCalculateCalories(String userId) {
-        // Get the workout list for the user
-        List<ExerciseDto> workoutList = temporaryWorkoutList.getOrDefault(userId, new ArrayList<>());
+        Mono<Boolean> hasWorkoutToday = fitnessRepository.findByUserIdAndFitnessDateBetween(userId, LocalDateTime.now().toLocalDate().atStartOfDay(), LocalDateTime.now()).hasElement();
+        return hasWorkoutToday.flatMap(hasWorkout -> {
+            if (hasWorkout) {
+                return updateWorkout(userId);
+            }
+            else
+            {
+                List<ExerciseDto> workoutList = temporaryWorkoutList.getOrDefault(userId, new ArrayList<>());
 
-        // Calculate the total calories from the workout list in a non-blocking way
-        Mono<Float> totalCaloriesMono = Flux.fromIterable(workoutList)
-                .map(ExerciseDto::getCaloriesBurned)
-                .reduce(0.0f, Float::sum); // No blocking here
+                // Calculate the total calories from the workout list in a non-blocking way
+                Mono<Float> totalCaloriesMono = Flux.fromIterable(workoutList)
+                        .map(ExerciseDto::getCaloriesBurned)
+                        .reduce(0.0f, Float::sum); // No blocking here
 
-        // Create a new FitnessModel object after the total calories are calculated
-        return totalCaloriesMono.flatMap(totalCalories -> {
-            FitnessModel fitnessModel = new FitnessModel();
-            fitnessModel.setUserId(userId);
-            fitnessModel.setFitnessDate(LocalDateTime.now()); // Set the current date and time
-            fitnessModel.setWorkoutList(workoutList);
-            fitnessModel.setTotalCaloriesBurned(totalCalories); // Set the total calories burned
+                // Create a new FitnessModel object after the total calories are calculated
+                return totalCaloriesMono.flatMap(totalCalories -> {
+                    FitnessModel fitnessModel = new FitnessModel();
+                    fitnessModel.setUserId(userId);
+                    fitnessModel.setFitnessDate(LocalDateTime.now()); // Set the current date and time
+                    fitnessModel.setWorkoutList(workoutList);
+                    fitnessModel.setTotalCaloriesBurned(totalCalories); // Set the total calories burned
 
-            // Save the FitnessModel with the total calories
-            return fitnessRepository.save(fitnessModel)
-                    .doOnSuccess(savedFitness -> temporaryWorkoutList.remove(userId)); // Clear the temporary list after saving
+                    // Save the FitnessModel with the total calories
+                    return fitnessRepository.save(fitnessModel)
+                            .doOnSuccess(savedFitness -> temporaryWorkoutList.remove(userId)); // Clear the temporary list after saving
+                });
+            }
         });
     }
 
